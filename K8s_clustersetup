@@ -1,0 +1,77 @@
+Introduction to Kubernetes:
+===========================
+k8s is an orchestrator for containerized applications
+
+kubeadm method for k8s cluster-setup:
+
+step1:
+Server 1= node1 --t2.micro
+Server 2= node2 --t2-micro
+Server 3= master --t2.medium
+
+sudo hostnamectl set-hostname "master"
+sudo hostnamectl set-hostname "node1"
+sudo hostnamectl set-hostname "node2"
+
+step2: Execute the following command on All the Nodes: as root user
+
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+sudo add-apt-repository    "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+
+step3: Get the Kubernetes gpg key(Execute the following command on All the Nodes): as root user
+curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
+
+step4: Add the Kubernetes repository(Execute the following command on All the Nodes): as root user
+cat << EOF | sudo tee /etc/apt/sources.list.d/kubernetes.list
+deb https://apt.kubernetes.io/ kubernetes-xenial main
+EOF
+step5: Update your packages(Execute the following command on All the Nodes): as root user
+apt-get update
+sudo apt-get install -y docker-ce=18.06.1~ce~3-0~ubuntu kubelet=1.15.7-00 kubeadm=1.15.7-00 kubectl=1.15.7-00
+step6 : Hold them at the current version(Execute the following command on All the Nodes): as root user
+sudo apt-mark hold docker-ce kubelet kubeadm kubectl
+step7: Add the iptables rule to sysctl.conf (Execute the following command on All the Nodes): as root user
+echo "net.bridge.bridge-nf-call-iptables=1" | sudo tee -a /etc/sysctl.conf
+step8: Enable iptables immediately(Execute the following command on All the Nodes: as root user
+sudo sysctl -p
+step9: On Master ONLY: as regular ubuntu user
+sudo kubeadm init --pod-network-cidr=10.244.0.0/16     # will generate kubectl join token
+sudo mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+note: open ports 6443,10250,10251 on the master node security group
+
+step10: Apply flanne or WEAVE CNI network overlay(Execute the following command only on the Master node): as ubuntu user
+
+kubectl apply -f https://raw.githubusercontent.com/flannel-io/flannel/master/Documentation/kube-flannel-old.yaml
+
+                                  #or
+
+# kubectl apply -f https://github.com/weaveworks/weave/releases/download/v2.8.1/weave-daemonset-k8s.yaml  
+
+
+step 11: On Node1 and Node 2: 
+  sudo kubeadm join ---(token from line 40)
+
+
+step12: test your cluster from the master node
+ kubectl get nodes <enter> you should see all your worker nodes registered
+
+===========================================================================================================
+
+  *if you ran into errors using WEAVE where your worker nodes are not poping up on master run step 12 below
+
+# step12: run the weave network plugin on all nodes: this optional
+#    kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"
+step13: test your cluster from the master node
+ kubectl get nodes <enter> you should see all your worker nodes registered
+
+=========================================================================================
+#kubeadm join 172.31.22.171:6443 --token iviez0.5lck3fre1zhgcibk \
+ #   --discovery-token-ca-cert-hash sha256:8928552224fd2879116fa7386a58fc844448c4f9c0fe378be2ed914893670d9e
+
+  #  kubeadm join 172.31.1.120:6443 --token 73k70a.43owj7enox9hzyl4 \
+   # --discovery-token-ca-cert-hash sha256:7f389eeea0737a3aca89d3d02b031b2e50b04c01df599279bcf80a73a0b56fbf
+
+good: kubectl apply -f https://github.com/weaveworks/weave/releases/download/v2.8.1/weave-daemonset-k8s.yaml
